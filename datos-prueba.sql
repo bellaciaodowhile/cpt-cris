@@ -25,6 +25,9 @@ DECLARE
   v_apellido TEXT;
   v_cedula TEXT;
   v_sexo TEXT;
+  v_nacionalidad TEXT;
+  v_etnia TEXT;
+  v_discapacidad TEXT;
   v_fecha_nac DATE;
   v_edad INTEGER;
   v_rango_edad TEXT;
@@ -54,6 +57,8 @@ BEGIN
     v_apellido := v_apellidos[1 + floor(random() * array_length(v_apellidos, 1))];
     v_cedula := lpad((10000000 + i)::TEXT, 8, '0');
     v_sexo := v_sexos[1 + floor(random() * 2)];
+    v_nacionalidad := v_nacionalidades[1 + floor(random() * 2)];
+    v_etnia := v_etnias[1 + floor(random() * array_length(v_etnias, 1))];
     
     -- Generar edad aleatoria entre 0 y 80 años
     v_edad := floor(random() * 81);
@@ -95,10 +100,10 @@ BEGIN
       v_nombre,
       v_apellido || ' ' || v_apellidos[1 + floor(random() * array_length(v_apellidos, 1))],
       v_cedula,
-      v_nacionalidades[1 + floor(random() * 2)],
+      v_nacionalidad,
       v_sexo,
       v_fecha_nac,
-      v_etnias[1 + floor(random() * array_length(v_etnias, 1))],
+      v_etnia,
       CASE WHEN random() < 0.1 THEN 'Sí' ELSE 'No' END
     )
     RETURNING id INTO v_paciente_id;
@@ -115,7 +120,7 @@ BEGIN
     
     -- Obtener datos del paciente
     SELECT nombres, apellidos, cedula, nacionalidad, sexo, fecha_nacimiento, etnia, discapacidad
-    INTO v_nombre, v_apellido, v_cedula, v_nacionalidades[1], v_sexo, v_fecha_nac, v_etnias[1], v_etnias[2]
+    INTO v_nombre, v_apellido, v_cedula, v_nacionalidad, v_sexo, v_fecha_nac, v_etnia, v_discapacidad
     FROM pacientes WHERE id = v_paciente_id;
     
     -- Calcular edad y rango
@@ -172,12 +177,12 @@ BEGIN
       v_nombre,
       v_apellido,
       v_cedula,
-      v_nacionalidades[1],
+      v_nacionalidad,
       v_sexo,
       v_fecha_nac,
       v_rango_edad,
-      v_etnias[1],
-      CASE WHEN random() < 0.1 THEN 'Sí' ELSE 'No' END,
+      v_etnia,
+      v_discapacidad,
       v_fecha_consulta,
       v_tipo_consulta,
       v_diagnostico
