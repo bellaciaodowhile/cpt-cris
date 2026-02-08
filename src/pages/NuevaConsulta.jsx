@@ -477,6 +477,8 @@ export default function NuevaConsulta() {
               >
                 <option value="V">V - Venezolano</option>
                 <option value="E">E - Extranjero</option>
+                <option value="C">C - Colombiano</option>
+                <option value="B">B - Brasileño</option>
               </select>
             </div>
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Search, Calendar } from 'lucide-react';
+import { Plus, Search, Calendar, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import LoadingSpinner from '../components/LoadingSpinner';
 import SkeletonCard from '../components/SkeletonCard';
@@ -14,12 +14,15 @@ export default function Consultas() {
   const [searchCedula, setSearchCedula] = useState('');
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
+  const [tipoFiltro, setTipoFiltro] = useState('todos'); // 'todos', 'Consultorio', 'Terreno'
+  const [stats, setStats] = useState({ total: 0, consultorio: 0, terreno: 0 });
 
   useEffect(() => {
     if (user) {
       loadConsultas();
+      loadStats();
     }
-  }, [user, searchCedula, fechaDesde, fechaHasta]);
+  }, [user, searchCedula, fechaDesde, fechaHasta, tipoFiltro]);
 
   const loadConsultas = async () => {
     setLoading(true);
@@ -45,6 +48,10 @@ export default function Consultas() {
         query = query.lte('fecha_consulta', fechaHasta);
       }
 
+      if (tipoFiltro !== 'todos') {
+        query = query.eq('tipo_consulta', tipoFiltro);
+      }
+
       const { data, error } = await query.limit(50);
 
       if (error) throw error;
@@ -53,6 +60,42 @@ export default function Consultas() {
       console.error('Error cargando consultas:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      let query = supabase
+        .from('consultas')
+        .select('tipo_consulta', { count: 'exact' })
+        .eq('user_id', user.id);
+
+      if (searchCedula) {
+        query = query.ilike('cedula_paciente', `%${searchCedula}%`);
+      }
+
+      if (fechaDesde) {
+        query = query.gte('fecha_consulta', fechaDesde);
+      }
+
+      if (fechaHasta) {
+        query = query.lte('fecha_consulta', fechaHasta);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      const consultorio = data?.filter(c => c.tipo_consulta === 'Consultorio').length || 0;
+      const terreno = data?.filter(c => c.tipo_consulta === 'Terreno').length || 0;
+
+      setStats({
+        total: data?.length || 0,
+        consultorio,
+        terreno
+      });
+    } catch (error) {
+      console.error('Error cargando estadísticas:', error);
     }
   };
 
@@ -72,7 +115,7 @@ export default function Consultas() {
       {/* Filtros */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
         <h2 className="font-semibold text-secondary mb-4">Filtros</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <Search size={16} className="inline mr-1" />
@@ -111,6 +154,60 @@ export default function Consultas() {
               onChange={(e) => setFechaHasta(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tipo de Consulta
+            </label>
+            <select
+              value={tipoFiltro}
+              onChange={(e) => setTipoFiltro(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            >
+              <option value="todos">Todos</option>
+              <option value="Consultorio">Consultorio</option>
+              <option value="Terreno">Terreno</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Estadísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Total Consultas</p>
+              <p className="text-2xl font-bold text-secondary">{stats.total}</p>
+            </div>
+            <div className="bg-purple-100 p-3 rounded-lg">
+              <FileText className="text-purple-600" size={24} />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Consultorio</p>
+              <p className="text-2xl font-bold text-blue-600">{stats.consultorio}</p>
+            </div>
+            <div className="bg-blue-100 p-3 rounded-lg">
+              <FileText className="text-blue-600" size={24} />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Terreno</p>
+              <p className="text-2xl font-bold text-green-600">{stats.terreno}</p>
+            </div>
+            <div className="bg-green-100 p-3 rounded-lg">
+              <FileText className="text-green-600" size={24} />
+            </div>
           </div>
         </div>
       </div>
