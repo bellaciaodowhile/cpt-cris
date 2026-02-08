@@ -22,22 +22,30 @@ export default function Dashboard() {
   const [tablaCronicas, setTablaCronicas] = useState([]);
   const [vistaCronicas, setVistaCronicas] = useState('tabla'); // 'tabla' o 'grafico'
   const [vistaMorbilidad, setVistaMorbilidad] = useState('tabla'); // 'tabla' o 'grafico'
+  const [tipoConsultaFiltro, setTipoConsultaFiltro] = useState('todos'); // 'todos', 'Consultorio', 'Terreno'
 
   useEffect(() => {
     if (user) {
       loadDashboardData();
     }
-  }, [user, fechaDesde, fechaHasta, vistaGrafico]);
+  }, [user, fechaDesde, fechaHasta, vistaGrafico, tipoConsultaFiltro]);
 
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const { data: consultas, error } = await supabase
+      let query = supabase
         .from('consultas')
         .select('*')
         .eq('user_id', user.id)
         .gte('fecha_consulta', fechaDesde)
         .lte('fecha_consulta', fechaHasta + 'T23:59:59');
+
+      // Aplicar filtro de tipo de consulta si no es "todos"
+      if (tipoConsultaFiltro !== 'todos') {
+        query = query.eq('tipo_consulta', tipoConsultaFiltro);
+      }
+
+      const { data: consultas, error } = await query;
 
       if (error) throw error;
 
@@ -129,7 +137,10 @@ export default function Dashboard() {
     ENFERMEDADES_MORBILIDAD.forEach(enf => {
       tabla[enf] = {};
       AGE_RANGES.forEach(rango => {
-        tabla[enf][rango] = { M: 0, F: 0 };
+        tabla[enf][rango] = { 
+          Consultorio: { M: 0, F: 0 },
+          Terreno: { M: 0, F: 0 }
+        };
       });
     });
 
@@ -138,7 +149,11 @@ export default function Dashboard() {
         ENFERMEDADES_MORBILIDAD.forEach(enf => {
           if (c.diagnostico.toLowerCase().includes(enf.toLowerCase())) {
             if (tabla[enf][c.rango_edad]) {
-              tabla[enf][c.rango_edad][c.sexo]++;
+              if (c.tipo_consulta === 'Consultorio') {
+                tabla[enf][c.rango_edad].Consultorio[c.sexo]++;
+              } else if (c.tipo_consulta === 'Terreno') {
+                tabla[enf][c.rango_edad].Terreno[c.sexo]++;
+              }
             }
           }
         });
@@ -153,8 +168,14 @@ export default function Dashboard() {
 
     ENFERMEDADES_CRONICAS.forEach(enf => {
       tabla[enf] = {
-        '0-19': { M: 0, F: 0 },
-        '20+': { M: 0, F: 0 }
+        '0-19': { 
+          Consultorio: { M: 0, F: 0 },
+          Terreno: { M: 0, F: 0 }
+        },
+        '20+': { 
+          Consultorio: { M: 0, F: 0 },
+          Terreno: { M: 0, F: 0 }
+        }
       };
     });
 
@@ -172,7 +193,12 @@ export default function Dashboard() {
             }
 
             const grupo = edad < 20 ? '0-19' : '20+';
-            tabla[enf][grupo][c.sexo]++;
+            
+            if (c.tipo_consulta === 'Consultorio') {
+              tabla[enf][grupo].Consultorio[c.sexo]++;
+            } else if (c.tipo_consulta === 'Terreno') {
+              tabla[enf][grupo].Terreno[c.sexo]++;
+            }
           }
         });
       }
@@ -190,7 +216,7 @@ export default function Dashboard() {
       {/* Filtros */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
         <h2 className="font-semibold text-secondary mb-4">Filtros</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <Calendar size={16} className="inline mr-1" />
@@ -229,6 +255,21 @@ export default function Dashboard() {
               <option value="dia">Por Día</option>
               <option value="semana">Por Semana</option>
               <option value="mes">Por Mes</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tipo de Consulta
+            </label>
+            <select
+              value={tipoConsultaFiltro}
+              onChange={(e) => setTipoConsultaFiltro(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            >
+              <option value="todos">Todos</option>
+              <option value="Consultorio">Consultorio</option>
+              <option value="Terreno">Terreno</option>
             </select>
           </div>
         </div>
@@ -270,9 +311,16 @@ export default function Dashboard() {
 
       {/* Tabla de Enfermedades Crónicas No Transmisibles */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-xl font-semibold text-secondary mb-4">
-          Enfermedades Crónicas No Transmisibles
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-secondary">
+            Enfermedades Crónicas No Transmisibles
+            {tipoConsultaFiltro !== 'todos' && (
+              <span className="ml-2 text-sm font-normal text-gray-600">
+                ({tipoConsultaFiltro})
+              </span>
+            )}
+          </h2>
+        </div>
         
         {/* Tabs */}
         <div className="mb-4">
@@ -305,83 +353,140 @@ export default function Dashboard() {
             <table className="min-w-full text-sm">
               <thead className="bg-gray-100">
                 <tr>
-                  <th className="px-4 py-2 text-left font-semibold">Enfermedad</th>
-                  <th className="px-4 py-2 text-center font-semibold" colSpan="3">0-19 años</th>
-                  <th className="px-4 py-2 text-center font-semibold" colSpan="3">20+ años</th>
-                  <th className="px-4 py-2 text-center font-semibold" colSpan="3">TOTAL</th>
+                  <th className="px-4 py-2 text-left font-semibold" rowSpan="3">Enfermedad</th>
+                  <th className="px-4 py-2 text-center font-semibold border-l border-gray-300" colSpan="6">0-19 años</th>
+                  <th className="px-4 py-2 text-center font-semibold border-l border-gray-300" colSpan="6">20+ años</th>
+                  <th className="px-4 py-2 text-center font-semibold border-l-2 border-gray-400" colSpan="6">TOTAL</th>
+                </tr>
+                <tr>
+                  <th className="px-1 py-1 text-xs border-l border-gray-300" colSpan="2">Cons</th>
+                  <th className="px-1 py-1 text-xs" colSpan="2">Terr</th>
+                  <th className="px-1 py-1 text-xs bg-gray-50" colSpan="2">Tot</th>
+                  <th className="px-1 py-1 text-xs border-l border-gray-300" colSpan="2">Cons</th>
+                  <th className="px-1 py-1 text-xs" colSpan="2">Terr</th>
+                  <th className="px-1 py-1 text-xs bg-gray-50" colSpan="2">Tot</th>
+                  <th className="px-1 py-1 text-xs border-l-2 border-gray-400" colSpan="2">Cons</th>
+                  <th className="px-1 py-1 text-xs" colSpan="2">Terr</th>
+                  <th className="px-1 py-1 text-xs bg-gray-50" colSpan="2">Tot</th>
                 </tr>
                 <tr className="bg-gray-50">
-                  <th></th>
-                  <th className="px-2 py-1 text-xs">M</th>
-                  <th className="px-2 py-1 text-xs">F</th>
-                  <th className="px-2 py-1 text-xs font-semibold">T</th>
-                  <th className="px-2 py-1 text-xs">M</th>
-                  <th className="px-2 py-1 text-xs">F</th>
-                  <th className="px-2 py-1 text-xs font-semibold">T</th>
-                  <th className="px-2 py-1 text-xs">M</th>
-                  <th className="px-2 py-1 text-xs">F</th>
-                  <th className="px-2 py-1 text-xs font-semibold">T</th>
+                  <th className="px-1 py-1 text-xs border-l border-gray-300">M</th>
+                  <th className="px-1 py-1 text-xs">F</th>
+                  <th className="px-1 py-1 text-xs">M</th>
+                  <th className="px-1 py-1 text-xs">F</th>
+                  <th className="px-1 py-1 text-xs font-semibold bg-blue-50">M</th>
+                  <th className="px-1 py-1 text-xs font-semibold bg-pink-50">F</th>
+                  <th className="px-1 py-1 text-xs border-l border-gray-300">M</th>
+                  <th className="px-1 py-1 text-xs">F</th>
+                  <th className="px-1 py-1 text-xs">M</th>
+                  <th className="px-1 py-1 text-xs">F</th>
+                  <th className="px-1 py-1 text-xs font-semibold bg-blue-50">M</th>
+                  <th className="px-1 py-1 text-xs font-semibold bg-pink-50">F</th>
+                  <th className="px-1 py-1 text-xs border-l-2 border-gray-400">M</th>
+                  <th className="px-1 py-1 text-xs">F</th>
+                  <th className="px-1 py-1 text-xs">M</th>
+                  <th className="px-1 py-1 text-xs">F</th>
+                  <th className="px-1 py-1 text-xs font-semibold bg-blue-100">M</th>
+                  <th className="px-1 py-1 text-xs font-semibold bg-pink-100">F</th>
                 </tr>
               </thead>
               <tbody>
                 {ENFERMEDADES_CRONICAS.map(enfermedad => {
-                  const m_0_19 = tablaCronicas[enfermedad]?.['0-19']?.M || 0;
-                  const f_0_19 = tablaCronicas[enfermedad]?.['0-19']?.F || 0;
-                  const t_0_19 = m_0_19 + f_0_19;
+                  const cons_m_0_19 = tablaCronicas[enfermedad]?.['0-19']?.Consultorio?.M || 0;
+                  const cons_f_0_19 = tablaCronicas[enfermedad]?.['0-19']?.Consultorio?.F || 0;
+                  const terr_m_0_19 = tablaCronicas[enfermedad]?.['0-19']?.Terreno?.M || 0;
+                  const terr_f_0_19 = tablaCronicas[enfermedad]?.['0-19']?.Terreno?.F || 0;
+                  const m_0_19 = cons_m_0_19 + terr_m_0_19;
+                  const f_0_19 = cons_f_0_19 + terr_f_0_19;
                   
-                  const m_20_plus = tablaCronicas[enfermedad]?.['20+']?.M || 0;
-                  const f_20_plus = tablaCronicas[enfermedad]?.['20+']?.F || 0;
-                  const t_20_plus = m_20_plus + f_20_plus;
+                  const cons_m_20_plus = tablaCronicas[enfermedad]?.['20+']?.Consultorio?.M || 0;
+                  const cons_f_20_plus = tablaCronicas[enfermedad]?.['20+']?.Consultorio?.F || 0;
+                  const terr_m_20_plus = tablaCronicas[enfermedad]?.['20+']?.Terreno?.M || 0;
+                  const terr_f_20_plus = tablaCronicas[enfermedad]?.['20+']?.Terreno?.F || 0;
+                  const m_20_plus = cons_m_20_plus + terr_m_20_plus;
+                  const f_20_plus = cons_f_20_plus + terr_f_20_plus;
                   
+                  const totalConsM = cons_m_0_19 + cons_m_20_plus;
+                  const totalConsF = cons_f_0_19 + cons_f_20_plus;
+                  const totalTerrM = terr_m_0_19 + terr_m_20_plus;
+                  const totalTerrF = terr_f_0_19 + terr_f_20_plus;
                   const totalM = m_0_19 + m_20_plus;
                   const totalF = f_0_19 + f_20_plus;
-                  const totalT = totalM + totalF;
 
                   return (
                     <tr key={enfermedad} className="border-t hover:bg-gray-50">
                       <td className="px-4 py-2 font-medium">{enfermedad}</td>
-                      <td className="px-2 py-2 text-center">{m_0_19 || '-'}</td>
-                      <td className="px-2 py-2 text-center">{f_0_19 || '-'}</td>
-                      <td className="px-2 py-2 text-center font-semibold bg-gray-100">{t_0_19 || '-'}</td>
-                      <td className="px-2 py-2 text-center">{m_20_plus || '-'}</td>
-                      <td className="px-2 py-2 text-center">{f_20_plus || '-'}</td>
-                      <td className="px-2 py-2 text-center font-semibold bg-gray-100">{t_20_plus || '-'}</td>
-                      <td className="px-2 py-2 text-center font-semibold bg-blue-50">{totalM || '-'}</td>
-                      <td className="px-2 py-2 text-center font-semibold bg-pink-50">{totalF || '-'}</td>
-                      <td className="px-2 py-2 text-center font-bold bg-purple-50">{totalT || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs border-l border-gray-300">{cons_m_0_19 || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs">{cons_f_0_19 || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs">{terr_m_0_19 || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs">{terr_f_0_19 || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs font-semibold bg-blue-50">{m_0_19 || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs font-semibold bg-pink-50">{f_0_19 || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs border-l border-gray-300">{cons_m_20_plus || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs">{cons_f_20_plus || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs">{terr_m_20_plus || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs">{terr_f_20_plus || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs font-semibold bg-blue-50">{m_20_plus || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs font-semibold bg-pink-50">{f_20_plus || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs border-l-2 border-gray-400">{totalConsM || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs">{totalConsF || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs">{totalTerrM || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs">{totalTerrF || '-'}</td>
+                      <td className="px-1 py-2 text-center text-xs font-bold bg-blue-100">{totalM}</td>
+                      <td className="px-1 py-2 text-center text-xs font-bold bg-pink-100">{totalF}</td>
                     </tr>
                   );
                 })}
                 <tr className="border-t-2 border-gray-400 bg-gray-100 font-bold">
                   <td className="px-4 py-2">TOTAL GENERAL</td>
                   {(() => {
-                    let grandM_0_19 = 0, grandF_0_19 = 0;
-                    let grandM_20_plus = 0, grandF_20_plus = 0;
+                    let grandConsM_0_19 = 0, grandConsF_0_19 = 0;
+                    let grandTerrM_0_19 = 0, grandTerrF_0_19 = 0;
+                    let grandConsM_20_plus = 0, grandConsF_20_plus = 0;
+                    let grandTerrM_20_plus = 0, grandTerrF_20_plus = 0;
                     
                     ENFERMEDADES_CRONICAS.forEach(enf => {
-                      grandM_0_19 += tablaCronicas[enf]?.['0-19']?.M || 0;
-                      grandF_0_19 += tablaCronicas[enf]?.['0-19']?.F || 0;
-                      grandM_20_plus += tablaCronicas[enf]?.['20+']?.M || 0;
-                      grandF_20_plus += tablaCronicas[enf]?.['20+']?.F || 0;
+                      grandConsM_0_19 += tablaCronicas[enf]?.['0-19']?.Consultorio?.M || 0;
+                      grandConsF_0_19 += tablaCronicas[enf]?.['0-19']?.Consultorio?.F || 0;
+                      grandTerrM_0_19 += tablaCronicas[enf]?.['0-19']?.Terreno?.M || 0;
+                      grandTerrF_0_19 += tablaCronicas[enf]?.['0-19']?.Terreno?.F || 0;
+                      grandConsM_20_plus += tablaCronicas[enf]?.['20+']?.Consultorio?.M || 0;
+                      grandConsF_20_plus += tablaCronicas[enf]?.['20+']?.Consultorio?.F || 0;
+                      grandTerrM_20_plus += tablaCronicas[enf]?.['20+']?.Terreno?.M || 0;
+                      grandTerrF_20_plus += tablaCronicas[enf]?.['20+']?.Terreno?.F || 0;
                     });
                     
-                    const grandT_0_19 = grandM_0_19 + grandF_0_19;
-                    const grandT_20_plus = grandM_20_plus + grandF_20_plus;
+                    const grandM_0_19 = grandConsM_0_19 + grandTerrM_0_19;
+                    const grandF_0_19 = grandConsF_0_19 + grandTerrF_0_19;
+                    const grandM_20_plus = grandConsM_20_plus + grandTerrM_20_plus;
+                    const grandF_20_plus = grandConsF_20_plus + grandTerrF_20_plus;
+                    const grandTotalConsM = grandConsM_0_19 + grandConsM_20_plus;
+                    const grandTotalConsF = grandConsF_0_19 + grandConsF_20_plus;
+                    const grandTotalTerrM = grandTerrM_0_19 + grandTerrM_20_plus;
+                    const grandTotalTerrF = grandTerrF_0_19 + grandTerrF_20_plus;
                     const grandTotalM = grandM_0_19 + grandM_20_plus;
                     const grandTotalF = grandF_0_19 + grandF_20_plus;
-                    const grandTotalT = grandTotalM + grandTotalF;
 
                     return (
                       <>
-                        <td className="px-2 py-2 text-center bg-blue-100">{grandM_0_19 || '-'}</td>
-                        <td className="px-2 py-2 text-center bg-pink-100">{grandF_0_19 || '-'}</td>
-                        <td className="px-2 py-2 text-center bg-gray-200">{grandT_0_19 || '-'}</td>
-                        <td className="px-2 py-2 text-center bg-blue-100">{grandM_20_plus || '-'}</td>
-                        <td className="px-2 py-2 text-center bg-pink-100">{grandF_20_plus || '-'}</td>
-                        <td className="px-2 py-2 text-center bg-gray-200">{grandT_20_plus || '-'}</td>
-                        <td className="px-2 py-2 text-center bg-blue-200">{grandTotalM || '-'}</td>
-                        <td className="px-2 py-2 text-center bg-pink-200">{grandTotalF || '-'}</td>
-                        <td className="px-2 py-2 text-center bg-purple-200">{grandTotalT || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs border-l border-gray-300">{grandConsM_0_19 || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs">{grandConsF_0_19 || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs">{grandTerrM_0_19 || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs">{grandTerrF_0_19 || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs bg-blue-100">{grandM_0_19 || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs bg-pink-100">{grandF_0_19 || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs border-l border-gray-300">{grandConsM_20_plus || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs">{grandConsF_20_plus || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs">{grandTerrM_20_plus || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs">{grandTerrF_20_plus || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs bg-blue-100">{grandM_20_plus || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs bg-pink-100">{grandF_20_plus || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs border-l-2 border-gray-400">{grandTotalConsM || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs">{grandTotalConsF || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs">{grandTotalTerrM || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs">{grandTotalTerrF || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs bg-blue-200">{grandTotalM || '-'}</td>
+                        <td className="px-1 py-2 text-center text-xs bg-pink-200">{grandTotalF || '-'}</td>
                       </>
                     );
                   })()}
@@ -419,9 +524,16 @@ export default function Dashboard() {
 
       {/* Tabla de Morbilidad */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold text-secondary mb-4">
-          Tabla de Morbilidad (Enfermedad x Edad x Sexo)
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-secondary">
+            Tabla de Morbilidad (Enfermedad x Edad x Sexo)
+            {tipoConsultaFiltro !== 'todos' && (
+              <span className="ml-2 text-sm font-normal text-gray-600">
+                ({tipoConsultaFiltro})
+              </span>
+            )}
+          </h2>
+        </div>
         
         {/* Tabs */}
         <div className="mb-4">
@@ -454,88 +566,89 @@ export default function Dashboard() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-100">
               <tr>
-                <th className="px-4 py-2 text-left font-semibold">Enfermedad</th>
+                <th className="px-4 py-2 text-left font-semibold" rowSpan="3">Enfermedad</th>
                 {AGE_RANGES.map(rango => (
-                  <th key={rango} className="px-2 py-2 text-center font-semibold" colSpan="3">
+                  <th key={rango} className="px-2 py-2 text-center font-semibold border-l border-gray-300" colSpan="6">
                     {rango}
                   </th>
                 ))}
-                <th className="px-4 py-2 text-center font-semibold" colSpan="3">Total</th>
+                <th className="px-4 py-2 text-center font-semibold border-l-2 border-gray-400" colSpan="6">Total</th>
               </tr>
-              <tr className="bg-gray-50">
-                <th></th>
+              <tr>
                 {AGE_RANGES.map(rango => (
                   <>
-                    <th key={`${rango}-M`} className="px-2 py-1 text-xs">M</th>
-                    <th key={`${rango}-F`} className="px-2 py-1 text-xs">F</th>
-                    <th key={`${rango}-T`} className="px-2 py-1 text-xs font-semibold">T</th>
+                    <th key={`${rango}-cons`} className="px-1 py-1 text-xs border-l border-gray-300" colSpan="2">Cons</th>
+                    <th key={`${rango}-terr`} className="px-1 py-1 text-xs" colSpan="2">Terr</th>
+                    <th key={`${rango}-tot`} className="px-1 py-1 text-xs bg-gray-50" colSpan="2">Tot</th>
                   </>
                 ))}
-                <th className="px-2 py-1 text-xs">M</th>
-                <th className="px-2 py-1 text-xs">F</th>
-                <th className="px-2 py-1 text-xs font-semibold">T</th>
+                <th className="px-1 py-1 text-xs border-l-2 border-gray-400" colSpan="2">Cons</th>
+                <th className="px-1 py-1 text-xs" colSpan="2">Terr</th>
+                <th className="px-1 py-1 text-xs bg-gray-50" colSpan="2">Tot</th>
+              </tr>
+              <tr className="bg-gray-50">
+                {AGE_RANGES.map(rango => (
+                  <>
+                    <th key={`${rango}-cons-M`} className="px-1 py-1 text-xs border-l border-gray-300">M</th>
+                    <th key={`${rango}-cons-F`} className="px-1 py-1 text-xs">F</th>
+                    <th key={`${rango}-terr-M`} className="px-1 py-1 text-xs">M</th>
+                    <th key={`${rango}-terr-F`} className="px-1 py-1 text-xs">F</th>
+                    <th key={`${rango}-tot-M`} className="px-1 py-1 text-xs font-semibold bg-blue-50">M</th>
+                    <th key={`${rango}-tot-F`} className="px-1 py-1 text-xs font-semibold bg-pink-50">F</th>
+                  </>
+                ))}
+                <th className="px-1 py-1 text-xs border-l-2 border-gray-400">M</th>
+                <th className="px-1 py-1 text-xs">F</th>
+                <th className="px-1 py-1 text-xs">M</th>
+                <th className="px-1 py-1 text-xs">F</th>
+                <th className="px-1 py-1 text-xs font-semibold bg-blue-100">M</th>
+                <th className="px-1 py-1 text-xs font-semibold bg-pink-100">F</th>
               </tr>
             </thead>
             <tbody>
               {ENFERMEDADES_MORBILIDAD.map(enfermedad => {
                 let totalM = 0, totalF = 0;
+                let totalConsM = 0, totalConsF = 0;
+                let totalTerrM = 0, totalTerrF = 0;
+                
                 return (
                   <tr key={enfermedad} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-2 font-medium">{enfermedad}</td>
+                    <td className="px-4 py-2 font-medium sticky left-0 bg-white">{enfermedad}</td>
                     {AGE_RANGES.map(rango => {
-                      const m = tablaMorbilidad[enfermedad]?.[rango]?.M || 0;
-                      const f = tablaMorbilidad[enfermedad]?.[rango]?.F || 0;
-                      const total = m + f;
+                      const consM = tablaMorbilidad[enfermedad]?.[rango]?.Consultorio?.M || 0;
+                      const consF = tablaMorbilidad[enfermedad]?.[rango]?.Consultorio?.F || 0;
+                      const terrM = tablaMorbilidad[enfermedad]?.[rango]?.Terreno?.M || 0;
+                      const terrF = tablaMorbilidad[enfermedad]?.[rango]?.Terreno?.F || 0;
+                      const m = consM + terrM;
+                      const f = consF + terrF;
+                      
                       totalM += m;
                       totalF += f;
+                      totalConsM += consM;
+                      totalConsF += consF;
+                      totalTerrM += terrM;
+                      totalTerrF += terrF;
+                      
                       return (
                         <>
-                          <td key={`${rango}-M`} className="px-2 py-2 text-center">{m || '-'}</td>
-                          <td key={`${rango}-F`} className="px-2 py-2 text-center">{f || '-'}</td>
-                          <td key={`${rango}-T`} className="px-2 py-2 text-center font-semibold bg-gray-100">{total || '-'}</td>
+                          <td key={`${rango}-cons-M`} className="px-1 py-2 text-center text-xs border-l border-gray-300">{consM || '-'}</td>
+                          <td key={`${rango}-cons-F`} className="px-1 py-2 text-center text-xs">{consF || '-'}</td>
+                          <td key={`${rango}-terr-M`} className="px-1 py-2 text-center text-xs">{terrM || '-'}</td>
+                          <td key={`${rango}-terr-F`} className="px-1 py-2 text-center text-xs">{terrF || '-'}</td>
+                          <td key={`${rango}-tot-M`} className="px-1 py-2 text-center text-xs font-semibold bg-blue-50">{m || '-'}</td>
+                          <td key={`${rango}-tot-F`} className="px-1 py-2 text-center text-xs font-semibold bg-pink-50">{f || '-'}</td>
                         </>
                       );
                     })}
-                    <td className="px-2 py-2 text-center font-semibold bg-blue-50">{totalM}</td>
-                    <td className="px-2 py-2 text-center font-semibold bg-pink-50">{totalF}</td>
-                    <td className="px-2 py-2 text-center font-bold bg-purple-50">{totalM + totalF}</td>
+                    <td className="px-1 py-2 text-center text-xs border-l-2 border-gray-400">{totalConsM || '-'}</td>
+                    <td className="px-1 py-2 text-center text-xs">{totalConsF || '-'}</td>
+                    <td className="px-1 py-2 text-center text-xs">{totalTerrM || '-'}</td>
+                    <td className="px-1 py-2 text-center text-xs">{totalTerrF || '-'}</td>
+                    <td className="px-1 py-2 text-center text-xs font-bold bg-blue-100">{totalM}</td>
+                    <td className="px-1 py-2 text-center text-xs font-bold bg-pink-100">{totalF}</td>
                   </tr>
                 );
               })}
-              <tr className="border-t-2 border-gray-400 bg-gray-100 font-bold">
-                <td className="px-4 py-2">TOTAL GENERAL</td>
-                {AGE_RANGES.map(rango => {
-                  let rangoM = 0, rangoF = 0;
-                  ENFERMEDADES_MORBILIDAD.forEach(enf => {
-                    rangoM += tablaMorbilidad[enf]?.[rango]?.M || 0;
-                    rangoF += tablaMorbilidad[enf]?.[rango]?.F || 0;
-                  });
-                  const rangoTotal = rangoM + rangoF;
-                  return (
-                    <>
-                      <td key={`${rango}-M-total`} className="px-2 py-2 text-center bg-blue-100">{rangoM || '-'}</td>
-                      <td key={`${rango}-F-total`} className="px-2 py-2 text-center bg-pink-100">{rangoF || '-'}</td>
-                      <td key={`${rango}-T-total`} className="px-2 py-2 text-center bg-gray-200">{rangoTotal || '-'}</td>
-                    </>
-                  );
-                })}
-                {(() => {
-                  let grandTotalM = 0, grandTotalF = 0;
-                  ENFERMEDADES_MORBILIDAD.forEach(enf => {
-                    AGE_RANGES.forEach(rango => {
-                      grandTotalM += tablaMorbilidad[enf]?.[rango]?.M || 0;
-                      grandTotalF += tablaMorbilidad[enf]?.[rango]?.F || 0;
-                    });
-                  });
-                  return (
-                    <>
-                      <td className="px-2 py-2 text-center bg-blue-200">{grandTotalM}</td>
-                      <td className="px-2 py-2 text-center bg-pink-200">{grandTotalF}</td>
-                      <td className="px-2 py-2 text-center bg-purple-200">{grandTotalM + grandTotalF}</td>
-                    </>
-                  );
-                })()}
-              </tr>
             </tbody>
           </table>
         </div>
