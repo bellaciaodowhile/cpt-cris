@@ -34,6 +34,7 @@ export default function NuevaConsulta() {
     medico_id: '',
     enfermedades: [],
     diagnostico_adicional: '',
+    tipo_paciente: 'Consultorio', // Agregamos el campo tipo_paciente
   });
 
   const [rangoEdad, setRangoEdad] = useState('');
@@ -70,10 +71,16 @@ export default function NuevaConsulta() {
 
   useEffect(() => {
     if (formData.fecha_consulta) {
-      const tipo = clasificarTipoConsulta(formData.fecha_consulta);
-      setTipoConsulta(tipo);
+      if (modoRegistro === 'nuevo') {
+        // Para pacientes nuevos, usar el tipo seleccionado manualmente
+        setTipoConsulta(formData.tipo_paciente);
+      } else {
+        // Para pacientes existentes, usar la clasificación automática por hora
+        const tipo = clasificarTipoConsulta(formData.fecha_consulta);
+        setTipoConsulta(tipo);
+      }
     }
-  }, [formData.fecha_consulta]);
+  }, [formData.fecha_consulta, formData.tipo_paciente, modoRegistro]);
 
   const loadMedicos = async () => {
     const { data } = await supabase
@@ -574,6 +581,110 @@ export default function NuevaConsulta() {
                 <option value="Sí">Sí</option>
               </select>
             </div>
+            
+            {/* Selector de tipo de paciente - solo para pacientes nuevos */}
+            {modoRegistro === 'nuevo' && (
+              <div className="md:col-span-2 mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-4">
+                  Tipo de Paciente *
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label className={`
+                    relative flex cursor-pointer rounded-lg border p-4 shadow-sm focus:outline-none transition-all duration-200
+                    ${formData.tipo_paciente === 'Consultorio' 
+                      ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500 ring-opacity-50' 
+                      : 'border-gray-300 bg-white hover:bg-gray-50'
+                    }
+                  `}>
+                    <input
+                      type="radio"
+                      className="sr-only"
+                      name="tipo_paciente"
+                      value="Consultorio"
+                      checked={formData.tipo_paciente === 'Consultorio'}
+                      onChange={handleChange}
+                    />
+                    <div className="flex">
+                      <div className="text-sm">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            formData.tipo_paciente === 'Consultorio' 
+                              ? 'border-blue-500 bg-blue-500' 
+                              : 'border-gray-300'
+                          }`}>
+                            {formData.tipo_paciente === 'Consultorio' && (
+                              <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
+                            )}
+                          </div>
+                          <span className={`font-medium ${
+                            formData.tipo_paciente === 'Consultorio' ? 'text-blue-900' : 'text-gray-900'
+                          }`}>
+                            Consultorio
+                          </span>
+                        </div>
+                        <p className={`text-sm ${
+                          formData.tipo_paciente === 'Consultorio' ? 'text-blue-700' : 'text-gray-500'
+                        }`}>
+                          Horario: 07:00 - 12:00
+                        </p>
+                        <p className={`text-xs ${
+                          formData.tipo_paciente === 'Consultorio' ? 'text-blue-600' : 'text-gray-400'
+                        }`}>
+                          Meta diaria: 10 consultas
+                        </p>
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className={`
+                    relative flex cursor-pointer rounded-lg border p-4 shadow-sm focus:outline-none transition-all duration-200
+                    ${formData.tipo_paciente === 'Terreno' 
+                      ? 'border-green-500 bg-green-50 ring-2 ring-green-500 ring-opacity-50' 
+                      : 'border-gray-300 bg-white hover:bg-gray-50'
+                    }
+                  `}>
+                    <input
+                      type="radio"
+                      className="sr-only"
+                      name="tipo_paciente"
+                      value="Terreno"
+                      checked={formData.tipo_paciente === 'Terreno'}
+                      onChange={handleChange}
+                    />
+                    <div className="flex">
+                      <div className="text-sm">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            formData.tipo_paciente === 'Terreno' 
+                              ? 'border-green-500 bg-green-500' 
+                              : 'border-gray-300'
+                          }`}>
+                            {formData.tipo_paciente === 'Terreno' && (
+                              <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
+                            )}
+                          </div>
+                          <span className={`font-medium ${
+                            formData.tipo_paciente === 'Terreno' ? 'text-green-900' : 'text-gray-900'
+                          }`}>
+                            Terreno
+                          </span>
+                        </div>
+                        <p className={`text-sm ${
+                          formData.tipo_paciente === 'Terreno' ? 'text-green-700' : 'text-gray-500'
+                        }`}>
+                          Horario: 13:00 - 16:00
+                        </p>
+                        <p className={`text-xs ${
+                          formData.tipo_paciente === 'Terreno' ? 'text-green-600' : 'text-gray-400'
+                        }`}>
+                          Meta diaria: 55 consultas
+                        </p>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
           </div>
           )}
         </div>

@@ -22,6 +22,7 @@ export default function Pacientes() {
     fecha_nacimiento: '',
     etnia: '',
     discapacidad: 'No',
+    tipo_paciente: 'Consultorio', // Nuevo campo para tipo de paciente
   });
 
   useEffect(() => {
@@ -33,16 +34,46 @@ export default function Pacientes() {
   const loadPacientes = async () => {
     setLoading(true);
     try {
+      // Cargar pacientes con su tipo más reciente basado en consultas
       const { data, error } = await supabase
         .from('pacientes')
-        .select('*')
+        .select(`
+          *,
+          consultas(tipo_consulta, fecha_consulta)
+        `)
         .eq('user_id', user.id)
         .order('apellidos', { ascending: true });
 
       if (error) throw error;
-      setPacientes(data || []);
+      
+      // Procesar pacientes para determinar su tipo actual
+      const pacientesConTipo = (data || []).map(paciente => {
+        // Encontrar la consulta más reciente
+        const consultasOrdenadas = (paciente.consultas || []).sort((a, b) => 
+          new Date(b.fecha_consulta) - new Date(a.fecha_consulta)
+        );
+        const tipoActual = consultasOrdenadas.length > 0 
+          ? consultasOrdenadas[0].tipo_consulta 
+          : 'Consultorio'; // Por defecto Consultorio para pacientes sin consultas
+          
+        return {
+          ...paciente,
+          tipo_actual: tipoActual,
+          consultas: undefined // Remover consultas del objeto final
+        };
+      });
+
+      setPacientes(pacientesConTipo);
     } catch (error) {
       console.error('Error cargando pacientes:', error);
+      // Fallback: cargar sin tipo de consulta
+      const { data } = await supabase
+        .from('pacientes')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('apellidos', { ascending: true });
+      
+      setPacientes((data || []).map(p => ({ ...p, tipo_actual: 'Consultorio' })));
     } finally {
       setLoading(false);
     }
@@ -89,6 +120,7 @@ export default function Pacientes() {
       fecha_nacimiento: paciente.fecha_nacimiento,
       etnia: paciente.etnia || '',
       discapacidad: paciente.discapacidad,
+      tipo_paciente: paciente.tipo_paciente || 'Consultorio',
     });
     setShowModal(true);
   };
@@ -110,6 +142,47 @@ export default function Pacientes() {
     }
   };
 
+  const handleTransferir = async (pacienteId, nuevoTipo) => {
+    if (!confirm(`¿Transferir este paciente a ${nuevoTipo}?`)) return;
+    
+    try {
+      // Crear una consulta de transferencia con la fecha y hora actual
+      const now = new Date();
+      const paciente = pacientes.find(p => p.id === pacienteId);
+      
+      if (!paciente) return;
+
+      const { error } = await supabase
+        .from('consultas')
+        .insert({
+          user_id: user.id,
+          paciente_id: pacienteId,
+          nombres: paciente.nombres,
+          apellidos: paciente.apellidos,
+          cedula_paciente: paciente.cedula,
+          sexo: paciente.sexo,
+          nacionalidad: paciente.nacionalidad,
+          etnia: paciente.etnia,
+          discapacidad: paciente.discapacidad,
+          fecha_nacimiento: paciente.fecha_nacimiento,
+          rango_edad: 'N/A', // Se puede calcular si es necesario
+          fecha_consulta: now.toISOString(),
+          tipo_consulta: nuevoTipo,
+          medico_id: null,
+          diagnostico: `Transferencia a ${nuevoTipo}`,
+        });
+
+      if (error) throw error;
+      
+      // Recargar pacientes para actualizar el tipo
+      loadPacientes();
+      alert(`Paciente transferido exitosamente a ${nuevoTipo}`);
+    } catch (error) {
+      console.error('Error transfiriendo paciente:', error);
+      alert('Error: ' + error.message);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       nombres: '',
@@ -120,6 +193,7 @@ export default function Pacientes() {
       fecha_nacimiento: '',
       etnia: '',
       discapacidad: 'No',
+      tipo_paciente: 'Consultorio',
     });
     setEditingPaciente(null);
   };
@@ -199,6 +273,14 @@ export default function Pacientes() {
                     </p>
                   </div>
                 </div>
+                {/* Indicador de tipo actual */}
+                <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  paciente.tipo_actual === 'Consultorio' 
+                    ? 'bg-blue-100 text-blue-800' 
+                    : 'bg-green-100 text-green-800'
+                }`}>
+                  {paciente.tipo_actual}
+                </div>
               </div>
 
               <div className="space-y-1 text-sm text-gray-600 mb-3">
@@ -221,20 +303,38 @@ export default function Pacientes() {
                 </p>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2">
+                {/* Botones principales */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleEdit(paciente)}
+                    className="flex-1 bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center gap-1"
+                  >
+                    <Edit2 size={16} />
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => handleDelete(paciente.id)}
+                    className="flex-1 bg-red-50 text-red-600 py-2 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-1"
+                  >
+                    <Trash2 size={16} />
+                    Eliminar
+                  </button>
+                </div>
+                
+                {/* Botón de transferencia */}
                 <button
-                  onClick={() => handleEdit(paciente)}
-                  className="flex-1 bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center gap-1"
+                  onClick={() => handleTransferir(
+                    paciente.id, 
+                    paciente.tipo_actual === 'Consultorio' ? 'Terreno' : 'Consultorio'
+                  )}
+                  className={`w-full py-2 rounded-lg text-sm font-medium transition-colors ${
+                    paciente.tipo_actual === 'Consultorio' 
+                      ? 'bg-green-50 text-green-700 hover:bg-green-100' 
+                      : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                  }`}
                 >
-                  <Edit2 size={16} />
-                  Editar
-                </button>
-                <button
-                  onClick={() => handleDelete(paciente.id)}
-                  className="flex-1 bg-red-50 text-red-600 py-2 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-1"
-                >
-                  <Trash2 size={16} />
-                  Eliminar
+                  Transferir a {paciente.tipo_actual === 'Consultorio' ? 'Terreno' : 'Consultorio'}
                 </button>
               </div>
             </div>
@@ -363,6 +463,108 @@ export default function Pacientes() {
                     <option value="No">No</option>
                     <option value="Sí">Sí</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Selector de tipo de paciente */}
+              <div className="mt-6">
+                <label className="block text-sm font-medium text-gray-700 mb-4">
+                  Tipo de Paciente *
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  <label className={`
+                    relative flex cursor-pointer rounded-lg border p-4 shadow-sm focus:outline-none transition-all duration-200
+                    ${formData.tipo_paciente === 'Consultorio' 
+                      ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500 ring-opacity-50' 
+                      : 'border-gray-300 bg-white hover:bg-gray-50'
+                    }
+                  `}>
+                    <input
+                      type="radio"
+                      className="sr-only"
+                      name="tipo_paciente"
+                      value="Consultorio"
+                      checked={formData.tipo_paciente === 'Consultorio'}
+                      onChange={(e) => setFormData({ ...formData, tipo_paciente: e.target.value })}
+                    />
+                    <div className="flex">
+                      <div className="text-sm">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            formData.tipo_paciente === 'Consultorio' 
+                              ? 'border-blue-500 bg-blue-500' 
+                              : 'border-gray-300'
+                          }`}>
+                            {formData.tipo_paciente === 'Consultorio' && (
+                              <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
+                            )}
+                          </div>
+                          <span className={`font-medium ${
+                            formData.tipo_paciente === 'Consultorio' ? 'text-blue-900' : 'text-gray-900'
+                          }`}>
+                            Consultorio
+                          </span>
+                        </div>
+                        <p className={`text-sm ${
+                          formData.tipo_paciente === 'Consultorio' ? 'text-blue-700' : 'text-gray-500'
+                        }`}>
+                          Horario: 07:00 - 12:00
+                        </p>
+                        <p className={`text-xs ${
+                          formData.tipo_paciente === 'Consultorio' ? 'text-blue-600' : 'text-gray-400'
+                        }`}>
+                          Meta diaria: 10 consultas
+                        </p>
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className={`
+                    relative flex cursor-pointer rounded-lg border p-4 shadow-sm focus:outline-none transition-all duration-200
+                    ${formData.tipo_paciente === 'Terreno' 
+                      ? 'border-green-500 bg-green-50 ring-2 ring-green-500 ring-opacity-50' 
+                      : 'border-gray-300 bg-white hover:bg-gray-50'
+                    }
+                  `}>
+                    <input
+                      type="radio"
+                      className="sr-only"
+                      name="tipo_paciente"
+                      value="Terreno"
+                      checked={formData.tipo_paciente === 'Terreno'}
+                      onChange={(e) => setFormData({ ...formData, tipo_paciente: e.target.value })}
+                    />
+                    <div className="flex">
+                      <div className="text-sm">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            formData.tipo_paciente === 'Terreno' 
+                              ? 'border-green-500 bg-green-500' 
+                              : 'border-gray-300'
+                          }`}>
+                            {formData.tipo_paciente === 'Terreno' && (
+                              <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
+                            )}
+                          </div>
+                          <span className={`font-medium ${
+                            formData.tipo_paciente === 'Terreno' ? 'text-green-900' : 'text-gray-900'
+                          }`}>
+                            Terreno
+                          </span>
+                        </div>
+                        <p className={`text-sm ${
+                          formData.tipo_paciente === 'Terreno' ? 'text-green-700' : 'text-gray-500'
+                        }`}>
+                          Horario: 13:00 - 16:00
+                        </p>
+                        <p className={`text-xs ${
+                          formData.tipo_paciente === 'Terreno' ? 'text-green-600' : 'text-gray-400'
+                        }`}>
+                          Meta diaria: 55 consultas
+                        </p>
+                      </div>
+                    </div>
+                  </label>
                 </div>
               </div>
 
