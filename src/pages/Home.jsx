@@ -435,14 +435,24 @@ export default function Home() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Link
-            to="/consultas/nueva"
-            className="bg-primary text-white py-3 px-6 rounded-lg font-medium hover:bg-opacity-90 transition-colors text-center"
+            to="/consultas/nueva?modo=existente"
+            className="bg-blue-600 text-white py-4 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center flex flex-col items-center gap-2"
           >
-            Nueva Consulta
+            <Users size={28} />
+            <span className="text-lg">Re-consulta</span>
+            <span className="text-sm opacity-90">Paciente Existente</span>
+          </Link>
+          <Link
+            to="/consultas/nueva?modo=nuevo"
+            className="bg-green-600 text-white py-4 px-6 rounded-lg font-medium hover:bg-green-700 transition-colors text-center flex flex-col items-center gap-2"
+          >
+            <FileText size={28} />
+            <span className="text-lg">Nueva Consulta</span>
+            <span className="text-sm opacity-90">Nuevo Paciente</span>
           </Link>
           <Link
             to="/dashboard"
-            className="bg-secondary text-white py-3 px-6 rounded-lg font-medium hover:bg-opacity-90 transition-colors text-center"
+            className="bg-secondary text-white py-3 px-6 rounded-lg font-medium hover:bg-opacity-90 transition-colors text-center md:col-span-2"
           >
             Ver Reportes
           </Link>

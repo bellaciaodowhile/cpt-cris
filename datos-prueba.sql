@@ -9,7 +9,7 @@
 -- Variables para usar en el script
 DO $$
 DECLARE
-  v_user_id UUID := 'TU_USER_ID_AQUI'::UUID; -- REEMPLAZAR CON TU USER_ID
+  v_user_id UUID := '16560171-a2ec-4d77-a3f9-3526f2c93785'::UUID; -- REEMPLAZAR CON TU USER_ID
   v_medico_id UUID;
   v_paciente_ids UUID[];
   v_fecha_base DATE := CURRENT_DATE - INTERVAL '21 days';

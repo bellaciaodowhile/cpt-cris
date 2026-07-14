@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { getAgeRange } from '../utils/ageRanges';
@@ -10,11 +10,15 @@ import { format } from 'date-fns';
 export default function NuevaConsulta() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [medicos, setMedicos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [error, setError] = useState('');
-  const [modoRegistro, setModoRegistro] = useState('existente'); // 'existente' o 'nuevo'
+  
+  // Detectar el modo desde la URL
+  const modoInicial = searchParams.get('modo') === 'nuevo' ? 'nuevo' : 'existente';
+  const [modoRegistro, setModoRegistro] = useState(modoInicial); // 'existente' o 'nuevo'
 
   const [formData, setFormData] = useState({
     paciente_id: '',
