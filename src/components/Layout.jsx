@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Home, FileText, BarChart3, Users, Stethoscope, LogOut, UserCircle } from 'lucide-react';
+import { Home, FileText, BarChart3, Users, Stethoscope, LogOut, UserCircle, Tag } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,6 +12,7 @@ export default function Layout() {
     { path: '/', icon: Home, label: 'Inicio' },
     { path: '/consultas', icon: FileText, label: 'Consultas' },
     { path: '/pacientes', icon: Users, label: 'Pacientes' },
+    { path: '/diagnosticos', icon: Tag, label: 'Diagnósticos' },
     { path: '/medicos', icon: Stethoscope, label: 'Médicos' },
     { path: '/dashboard', icon: BarChart3, label: 'Estadísticas' },
     { path: '/perfil', icon: UserCircle, label: 'Perfil' },

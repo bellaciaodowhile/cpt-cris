@@ -9,6 +9,7 @@ import NuevaConsulta from './pages/NuevaConsulta';
 import Dashboard from './pages/Dashboard';
 import Medicos from './pages/Medicos';
 import Pacientes from './pages/Pacientes';
+import Diagnosticos from './pages/Diagnosticos';
 import Perfil from './pages/Perfil';
 
 function App() {
@@ -30,6 +31,7 @@ function App() {
             <Route path="consultas" element={<Consultas />} />
             <Route path="consultas/nueva" element={<NuevaConsulta />} />
             <Route path="pacientes" element={<Pacientes />} />
+            <Route path="diagnosticos" element={<Diagnosticos />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="medicos" element={<Medicos />} />
             <Route path="perfil" element={<Perfil />} />

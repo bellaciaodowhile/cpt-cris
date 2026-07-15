@@ -4,7 +4,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { getAgeRange } from '../utils/ageRanges';
 import { clasificarTipoConsulta, ENFERMEDADES_PREDETERMINADAS } from '../utils/consultaUtils';
-import { ArrowLeft, Save, Loader2, Search, User } from 'lucide-react';
+import { getDiagnosticosParaTipo } from '../utils/diagnosticosUtils';
+import { ArrowLeft, Save, Loader2, Search, User, Building2, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function NuevaConsulta() {
@@ -41,11 +42,17 @@ export default function NuevaConsulta() {
   const [tipoConsulta, setTipoConsulta] = useState('Consultorio');
   const [searchPaciente, setSearchPaciente] = useState('');
   const [edadCalculada, setEdadCalculada] = useState(null);
+  const [diagnosticosDisponibles, setDiagnosticosDisponibles] = useState({
+    predeterminados: ENFERMEDADES_PREDETERMINADAS,
+    personalizados: [],
+    porCategoria: {}
+  });
 
   useEffect(() => {
     if (user) {
       loadMedicos();
       loadPacientes();
+      loadDiagnosticosDisponibles('Consultorio');
     }
   }, [user]);
 
@@ -71,16 +78,38 @@ export default function NuevaConsulta() {
 
   useEffect(() => {
     if (formData.fecha_consulta) {
-      if (modoRegistro === 'nuevo') {
-        // Para pacientes nuevos, usar el tipo seleccionado manualmente
-        setTipoConsulta(formData.tipo_paciente);
-      } else {
-        // Para pacientes existentes, usar la clasificación automática por hora
-        const tipo = clasificarTipoConsulta(formData.fecha_consulta);
-        setTipoConsulta(tipo);
-      }
+      const tipo = clasificarTipoConsulta(formData.fecha_consulta);
+      setTipoConsulta(tipo);
     }
-  }, [formData.fecha_consulta, formData.tipo_paciente, modoRegistro]);
+  }, [formData.fecha_consulta]);
+
+  // Actualizar tipoConsulta cuando cambia formData.tipo_paciente
+  // Este useEffect es para el selector visual
+  useEffect(() => {
+    setTipoConsulta(formData.tipo_paciente);
+  }, [formData.tipo_paciente]);
+
+  // Cargar diagnósticos disponibles cuando cambie el tipo de consulta
+  useEffect(() => {
+    if (user && tipoConsulta) {
+      loadDiagnosticosDisponibles(tipoConsulta);
+    }
+  }, [user, tipoConsulta]);
+
+  const loadDiagnosticosDisponibles = async (tipo) => {
+    try {
+      const diagnosticos = await getDiagnosticosParaTipo(user.id, tipo);
+      setDiagnosticosDisponibles(diagnosticos);
+    } catch (error) {
+      console.error('Error cargando diagnósticos:', error);
+      // Usar solo predeterminados en caso de error
+      setDiagnosticosDisponibles({
+        predeterminados: ENFERMEDADES_PREDETERMINADAS,
+        personalizados: [],
+        porCategoria: {}
+      });
+    }
+  };
 
   const loadMedicos = async () => {
     const { data } = await supabase
@@ -269,6 +298,85 @@ export default function NuevaConsulta() {
       )}
 
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-6 space-y-6">
+        {/* Selector de Tipo de Consulta */}
+        <div>
+          <h2 className="text-xl font-semibold text-secondary mb-4">Selecciona el tipo de consulta</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div
+              onClick={() => setFormData(prev => ({ ...prev, tipo_paciente: 'Consultorio' }))}
+              className={`relative flex flex-col cursor-pointer rounded-lg border-2 p-6 shadow-md transition-all duration-200 ${
+                formData.tipo_paciente === 'Consultorio'
+                  ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500 ring-opacity-50'
+                  : 'border-gray-300 bg-white hover:border-blue-300'
+              }`}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                  formData.tipo_paciente === 'Consultorio'
+                    ? 'border-blue-500 bg-blue-500'
+                    : 'border-gray-300'
+                }`}>
+                  {formData.tipo_paciente === 'Consultorio' && (
+                    <div className="w-2 h-2 rounded-full bg-white"></div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Building2 size={24} className="text-blue-600" />
+                  <span className="text-lg font-semibold text-secondary">Consultorio</span>
+                </div>
+              </div>
+              <p className={`text-sm font-medium mb-1 ${
+                formData.tipo_paciente === 'Consultorio' ? 'text-blue-700' : 'text-gray-600'
+              }`}>
+                Horario: 07:00 - 12:00
+              </p>
+              <p className={`text-xs ${
+                formData.tipo_paciente === 'Consultorio' ? 'text-blue-600' : 'text-gray-500'
+              }`}>
+                Meta diaria: 10 consultas
+              </p>
+            </div>
+
+            <div
+              onClick={() => setFormData(prev => ({ ...prev, tipo_paciente: 'Terreno' }))}
+              className={`relative flex flex-col cursor-pointer rounded-lg border-2 p-6 shadow-md transition-all duration-200 ${
+                formData.tipo_paciente === 'Terreno'
+                  ? 'border-green-500 bg-green-50 ring-2 ring-green-500 ring-opacity-50'
+                  : 'border-gray-300 bg-white hover:border-green-300'
+              }`}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                  formData.tipo_paciente === 'Terreno'
+                    ? 'border-green-500 bg-green-500'
+                    : 'border-gray-300'
+                }`}>
+                  {formData.tipo_paciente === 'Terreno' && (
+                    <div className="w-2 h-2 rounded-full bg-white"></div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin size={24} className="text-green-600" />
+                  <span className="text-lg font-semibold text-secondary">Terreno</span>
+                </div>
+              </div>
+              <p className={`text-sm font-medium mb-1 ${
+                formData.tipo_paciente === 'Terreno' ? 'text-green-700' : 'text-gray-600'
+              }`}>
+                Horario: 13:00 - 16:00
+              </p>
+              <p className={`text-xs ${
+                formData.tipo_paciente === 'Terreno' ? 'text-green-600' : 'text-gray-500'
+              }`}>
+                Meta diaria: 55 consultas
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Separador visual */}
+        <div className="border-t border-gray-200 pt-6"></div>
+
         {/* Datos del Paciente */}
         <div>
           <h2 className="text-xl font-semibold text-secondary mb-4">Datos del Paciente</h2>
@@ -733,17 +841,20 @@ export default function NuevaConsulta() {
 
         {/* Diagnóstico */}
         <div>
-          <h2 className="text-xl font-semibold text-secondary mb-4">Diagnóstico</h2>
+          <h2 className="text-xl font-semibold text-secondary mb-4">
+            Diagnóstico - {tipoConsulta}
+          </h2>
           
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          {/* Diagnósticos Predeterminados */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
               Enfermedades Predeterminadas
             </label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {ENFERMEDADES_PREDETERMINADAS.map(enfermedad => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+              {diagnosticosDisponibles.predeterminados.map(enfermedad => (
                 <label
                   key={enfermedad}
-                  className="flex items-center gap-2 p-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50"
+                  className="flex items-center gap-2 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
                 >
                   <input
                     type="checkbox"
@@ -757,6 +868,81 @@ export default function NuevaConsulta() {
             </div>
           </div>
 
+          {/* Diagnósticos Personalizados por Categorías */}
+          {Object.keys(diagnosticosDisponibles.porCategoria).length > 0 && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Diagnósticos Personalizados
+              </label>
+              <div className="space-y-4">
+                {Object.entries(diagnosticosDisponibles.porCategoria).map(([categoriaNombre, categoriaData]) => (
+                  <div key={categoriaNombre} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div 
+                        className="w-4 h-4 rounded-full"
+                        style={{ backgroundColor: categoriaData.color }}
+                      ></div>
+                      <h3 className="font-medium text-gray-900">{categoriaNombre}</h3>
+                      <span className="text-xs text-gray-500">({categoriaData.diagnosticos.length})</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {categoriaData.diagnosticos.map(diagnostico => (
+                        <label
+                          key={diagnostico.id}
+                          className="flex items-center gap-2 p-2 border border-gray-200 rounded-md cursor-pointer hover:bg-gray-50 transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={formData.enfermedades.includes(diagnostico.nombre)}
+                            onChange={() => handleEnfermedadToggle(diagnostico.nombre)}
+                            className="w-4 h-4 text-primary focus:ring-primary"
+                          />
+                          <div className="flex-1">
+                            <span className="text-sm font-medium">{diagnostico.nombre}</span>
+                            {diagnostico.descripcion && (
+                              <p className="text-xs text-gray-500 mt-1">{diagnostico.descripcion}</p>
+                            )}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Diagnósticos Personalizados Sin Categoría */}
+          {diagnosticosDisponibles.personalizados.length > 0 && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Otros Diagnósticos Personalizados
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {diagnosticosDisponibles.personalizados.map(diagnostico => (
+                  <label
+                    key={diagnostico.id}
+                    className="flex items-center gap-2 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={formData.enfermedades.includes(diagnostico.nombre)}
+                      onChange={() => handleEnfermedadToggle(diagnostico.nombre)}
+                      className="w-4 h-4 text-primary focus:ring-primary"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-medium">{diagnostico.nombre}</span>
+                      {diagnostico.descripcion && (
+                        <p className="text-xs text-gray-500 mt-1">{diagnostico.descripcion}</p>
+                      )}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Diagnóstico Adicional */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Diagnóstico Adicional
@@ -766,7 +952,7 @@ export default function NuevaConsulta() {
               value={formData.diagnostico_adicional}
               onChange={handleChange}
               rows="3"
-              placeholder="Agregar otros diagnósticos..."
+              placeholder="Agregar otros diagnósticos no listados..."
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             />
           </div>

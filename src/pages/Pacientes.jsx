@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Search, Edit2, Trash2, User, Calendar } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, User, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import LoadingSpinner from '../components/LoadingSpinner';
 import SkeletonCard from '../components/SkeletonCard';
@@ -13,6 +13,7 @@ export default function Pacientes() {
   const [showModal, setShowModal] = useState(false);
   const [editingPaciente, setEditingPaciente] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loadingForm, setLoadingForm] = useState(false);
   const [formData, setFormData] = useState({
     nombres: '',
     apellidos: '',
@@ -22,7 +23,7 @@ export default function Pacientes() {
     fecha_nacimiento: '',
     etnia: '',
     discapacidad: 'No',
-    tipo_paciente: 'Consultorio', // Nuevo campo para tipo de paciente
+    tipo_paciente: 'Consultorio',
   });
 
   useEffect(() => {
@@ -81,6 +82,7 @@ export default function Pacientes() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoadingForm(true);
     try {
       if (editingPaciente) {
         const { error } = await supabase
@@ -106,6 +108,8 @@ export default function Pacientes() {
     } catch (error) {
       console.error('Error guardando paciente:', error);
       alert('Error: ' + error.message);
+    } finally {
+      setLoadingForm(false);
     }
   };
 
@@ -575,18 +579,37 @@ export default function Pacientes() {
                     setShowModal(false);
                     resetForm();
                   }}
-                  className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300 transition-colors"
+                  className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300 transition-colors disabled:opacity-50"
+                  disabled={loadingForm}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-primary text-white py-3 rounded-lg font-medium hover:bg-opacity-90 transition-colors"
+                  disabled={loadingForm}
+                  className="flex-1 bg-primary text-white py-3 rounded-lg font-medium hover:bg-opacity-90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {editingPaciente ? 'Actualizar' : 'Guardar'}
+                  {loadingForm ? (
+                    <>
+                      <Loader2 className="animate-spin" size={18} />
+                      Guardando...
+                    </>
+                  ) : (
+                    editingPaciente ? 'Actualizar' : 'Guardar'
+                  )}
                 </button>
               </div>
             </form>
+            
+            {/* Overlay de carga */}
+            {loadingForm && (
+              <div className="absolute inset-0 bg-black bg-opacity-20 rounded-lg flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="animate-spin text-primary" size={32} />
+                  <p className="text-sm font-medium text-secondary">Procesando...</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
